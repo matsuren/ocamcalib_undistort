@@ -1,4 +1,5 @@
 import numpy as np
+import cv2 # only for valid_area
 
 
 class OcamCamera:
@@ -23,7 +24,7 @@ class OcamCamera:
         # affine parameters "c", "d", "e"
         self.affine = calibdata[3]
         # image size: "height" and "width"
-        self.img_size = calibdata[4]
+        self.img_size = (int(calibdata[4][0]), int(calibdata[4][1]))
 
         if (show_flag):
             print("pol :" + str(self.pol))
@@ -96,6 +97,18 @@ class OcamCamera:
         point2D[0][valid_flag] = v * self.affine[2] + u + self.yc
         point2D[1][valid_flag] = v * self.affine[0] + u * self.affine[1] + self.xc
         return point2D
+
+    def valid_area(self, fov=180):
+        """
+        get valid area based on fov. skew parameter is not considered for simplicity
+        :param float : fov in degree
+        :return np.array : mask 255:inside fov, 0:outside fov
+        """
+        valid = np.zeros(self.img_size, dtype=np.uint8)
+        theta = np.deg2rad(fov / 2) - np.pi / 2
+        rho = sum([elment * theta ** i for (i, elment) in enumerate(self.invpol)])
+        cv2.ellipse(valid, ((self.yc, self.xc), (2 * rho, 2 * rho * self.affine[0]), 0), (255), -1)
+        return valid
 
 
 if __name__ == '__main__':
