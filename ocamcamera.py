@@ -1,11 +1,11 @@
 import numpy as np
-import cv2 # only for valid_area
+import cv2  # only for valid_area
 
 
 class OcamCamera:
     """ using Ocamcalib """
 
-    def __init__(self, filename, show_flag=True):
+    def __init__(self, filename, show_flag=False):
         with open(filename, "r") as file:
             lines = file.readlines()
         calibdata = []
@@ -26,12 +26,17 @@ class OcamCamera:
         # image size: "height" and "width"
         self.img_size = (int(calibdata[4][0]), int(calibdata[4][1]))
 
-        if (show_flag):
-            print("pol :" + str(self.pol))
-            print("invpol :" + str(self.invpol))
-            print("xc :" + str(self.xc) + "\tyc :" + str(self.yc))
-            print("affine :" + str(self.affine))
-            print("img_size :" + str(self.img_size))
+        if show_flag:
+            print(self)
+
+    def __repr__(self):
+        print_list = []
+        print_list.append(f"pol: {self.pol}")
+        print_list.append(f"invpol: {self.invpol}")
+        print_list.append(f"xc(col dir): {self.xc}, \tyc(row dir): {self.yc} in Ocam coord")
+        print_list.append(f"affine: {self.affine}")
+        print_list.append(f"img_size: {self.img_size}")
+        return "\n".join(print_list)
 
     def cam2world(self, point2D):
         """
