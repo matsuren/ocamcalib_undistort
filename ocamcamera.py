@@ -3,7 +3,26 @@ import cv2  # only for valid_area
 
 
 class OcamCamera:
-    """ using Ocamcalib """
+    """ OCamCalib[1] unndistortion class
+
+    Parameters
+    ----------
+    filename : str
+        OcamCalib calibration filename
+    show_flag : bool
+        flag for showing calibration data
+
+    Attributes
+    ----------
+    width : int
+        image width
+    height : int
+        image height
+
+    References
+    ----------
+    [1] https://sites.google.com/site/scarabotix/ocamcalib-toolbox
+    """
 
     def __init__(self, filename, show_flag=False):
         with open(filename, "r") as file:
@@ -30,13 +49,20 @@ class OcamCamera:
             print(self)
 
     def cam2world(self, point2D):
-        """
-        CAM2WORLD projects a 2D point onto the unit sphere
-        The coordinate is different than that of the original ocamcalib
-        Point3D coord: x:right direction, y:down direction, z:front direction
-        Point2D coord: x:row direction, y:col direction (OpenCV image coordinate)
-        :param np.array point2D: array of point in image 2xN
-        :return np.array point3D: array of point on unit sphere 3xN
+        """ cam2world projects a 2D point onto the unit sphere.
+        The coordinate is different than that of the original OcamCalib.
+        point3D coord: x:right direction, y:down direction, z:front direction
+        point2D coord: x:row direction, y:col direction (OpenCV image coordinate)
+
+        Parameters
+        ----------
+        point2D : numpy array or list([u,v])
+            array of point in image 2xN
+
+        Returns
+        -------
+        point3D : numpy array
+            array of point on unit sphere 3xN
         """
         # in case of point2D = list([u, v])
         if isinstance(point2D, list):
@@ -59,13 +85,20 @@ class OcamCamera:
         return point3D
 
     def world2cam(self, point3D):
-        """
-        WORLD2CAM projects a 3D point on to the image
-        The coordinate is different than that of the original ocamcalib
-        Point3D coord: x:right direction, y:down direction, z:front direction
-        Point2D coord: x:row direction, y:col direction (OpenCV image coordinate)
-        :param np.array point3D: array of point in cam coord 3xN
-        :return np.array point2D: array of point in image 2xN
+        """ world2cam projects a 3D point on to the image.
+        The coordinate is different than that of the original OcamCalib.
+        point3D coord: x:right direction, y:down direction, z:front direction
+        point2D coord: x:row direction, y:col direction (OpenCV image coordinate)
+
+        Parameters
+        ----------
+        point3D : numpy array or list([x, y, z])
+            array of points in camera coordinate (3xN)
+
+        Returns
+        -------
+        point2D : numpy array
+            array of points in image (2xN)
         """
         # in case of point3D = list([x,y,z])
         if isinstance(point3D, list):
@@ -95,11 +128,19 @@ class OcamCamera:
         return point2D
 
     def valid_area(self, fov=180):
+        """ Get valid area based on field of view (fov). skew parameter is not considered for simplicity.
+
+        Parameters
+        ----------
+        fov : float
+            field of view of the camera in degree
+
+        Returns
+        -------
+        valid : numpy array
+            2D (height x width) array mask. 255:inside fov, 0:outside fov
         """
-        get valid area based on fov. skew parameter is not considered for simplicity
-        :param float : fov in degree
-        :return np.array : mask 255:inside fov, 0:outside fov
-        """
+
         valid = np.zeros(self._img_size, dtype=np.uint8)
         theta = np.deg2rad(fov / 2) - np.pi / 2
         rho = sum([elment * theta ** i for (i, elment) in enumerate(self._invpol)])
