@@ -106,6 +106,14 @@ class OcamCamera:
         cv2.ellipse(valid, ((self._yc, self._xc), (2 * rho, 2 * rho * self._affine[0]), 0), (255), -1)
         return valid
 
+    @property
+    def width(self):
+        return self._img_size[1]
+
+    @property
+    def height(self):
+        return self._img_size[0]
+
     def __repr__(self):
         print_list = []
         print_list.append(f"pol: {self._pol}")
