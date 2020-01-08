@@ -3,12 +3,14 @@ import cv2  # only for valid_area
 
 
 class OcamCamera:
-    """ OCamCalib[1] unndistortion class
+    """ OCamCalib[1] unndistortion class.
 
     Parameters
     ----------
     filename : str
         OcamCalib calibration filename
+    fov : float
+        field of view of the camera in degree
     show_flag : bool
         flag for showing calibration data
 
@@ -24,7 +26,7 @@ class OcamCamera:
     [1] https://sites.google.com/site/scarabotix/ocamcalib-toolbox
     """
 
-    def __init__(self, filename, show_flag=False):
+    def __init__(self, filename, fov=360, show_flag=False):
         with open(filename, "r") as file:
             lines = file.readlines()
         calibdata = []
@@ -45,11 +47,15 @@ class OcamCamera:
         # image size: "height" and "width"
         self._img_size = (int(calibdata[4][0]), int(calibdata[4][1]))
 
+        # field of view
+        self._fov = fov
+
         if show_flag:
             print(self)
 
     def cam2world(self, point2D):
-        """ cam2world projects a 2D point onto the unit sphere.
+        """ cam2world(point2D) projects a 2D point onto the unit sphere.
+        In this function fov of the camera is not considered.
         The coordinate is different than that of the original OcamCalib.
         point3D coord: x:right direction, y:down direction, z:front direction
         point2D coord: x:row direction, y:col direction (OpenCV image coordinate)
@@ -63,6 +69,13 @@ class OcamCamera:
         -------
         point3D : numpy array
             array of point on unit sphere 3xN
+
+        Examples
+        --------
+        >>> ocam = OcamCamera('./calib_results_0.txt')
+        >>> ocam.cam2world([502,900]).tolist() # project a point onto unit sphere
+        [[-0.5776824148317081], [0.20599312860435134], [0.7898416667674589]]
+        >>> tmp = ocam.cam2world(1600*np.random.rand(2, 10)) # project multiple points without error
         """
         # in case of point2D = list([u, v])
         if isinstance(point2D, list):
@@ -85,10 +98,12 @@ class OcamCamera:
         return point3D
 
     def world2cam(self, point3D):
-        """ world2cam projects a 3D point on to the image.
+        """ world2cam(point3D) projects a 3D point on to the image.
+        If points are projected on the outside of the fov, return (-1,-1).
+        Also, return (-1, -1), if point (x, y, z) = (0, 0, 0).
         The coordinate is different than that of the original OcamCalib.
         point3D coord: x:right direction, y:down direction, z:front direction
-        point2D coord: x:row direction, y:col direction (OpenCV image coordinate)
+        point2D coord: x:row direction, y:col direction (OpenCV image coordinate).
 
         Parameters
         ----------
@@ -99,6 +114,17 @@ class OcamCamera:
         -------
         point2D : numpy array
             array of points in image (2xN)
+
+        Examples
+        --------
+        >>> ocam = OcamCamera('./calib_results_0.txt')
+        >>> ocam.world2cam([1,1,2.0]).tolist() # project a point on image
+        [[1004.8294677734375], [1001.1594848632812]]
+        >>> tmp = ocam.world2cam(np.random.rand(3, 10)) # project multiple points without error
+        >>> ocam.world2cam([0,0,2.0]).tolist() # return optical center
+        [[798.1757202148438], [794.3086547851562]]
+        >>> ocam.world2cam([0,0,0]).tolist()
+        [[-1.0], [-1.0]]
         """
         # in case of point3D = list([x,y,z])
         if isinstance(point3D, list):
@@ -116,6 +142,10 @@ class OcamCamera:
         # optical center
         point2D[0][~valid_flag] = self._yc
         point2D[1][~valid_flag] = self._xc
+        # point = (0, 0, 0)
+        zero_flag = (point3D == 0).all(axis=0)
+        point2D[0][zero_flag] = -1
+        point2D[1][zero_flag] = -1
 
         # else
         theta = -np.arctan(point3D[2][valid_flag] / norm[valid_flag])
@@ -123,17 +153,24 @@ class OcamCamera:
         rho = np.array([elment * theta ** i for (i, elment) in enumerate(self._invpol)]).sum(axis=0)
         u = point3D[0][valid_flag] * invnorm * rho
         v = point3D[1][valid_flag] * invnorm * rho
-        point2D[0][valid_flag] = v * self._affine[2] + u + self._yc
-        point2D[1][valid_flag] = v * self._affine[0] + u * self._affine[1] + self._xc
+        point2D_valid_0 = v * self._affine[2] + u + self._yc
+        point2D_valid_1 = v * self._affine[0] + u * self._affine[1] + self._xc
+
+        if self._fov < 360:
+            # finally deal with points are outside of fov
+            thresh_theta = np.deg2rad(self._fov / 2) - np.pi / 2
+            # set flag when  or point3D == (0, 0, 0)
+            outside_flag = theta > thresh_theta
+            point2D_valid_0[outside_flag] = -1
+            point2D_valid_1[outside_flag] = -1
+
+        point2D[0][valid_flag] = point2D_valid_0
+        point2D[1][valid_flag] = point2D_valid_1
+
         return point2D
 
-    def valid_area(self, fov=180):
+    def valid_area(self):
         """ Get valid area based on field of view (fov). skew parameter is not considered for simplicity.
-
-        Parameters
-        ----------
-        fov : float
-            field of view of the camera in degree
 
         Returns
         -------
@@ -142,17 +179,19 @@ class OcamCamera:
         """
 
         valid = np.zeros(self._img_size, dtype=np.uint8)
-        theta = np.deg2rad(fov / 2) - np.pi / 2
+        theta = np.deg2rad(self._fov / 2) - np.pi / 2
         rho = sum([elment * theta ** i for (i, elment) in enumerate(self._invpol)])
         cv2.ellipse(valid, ((self._yc, self._xc), (2 * rho, 2 * rho * self._affine[0]), 0), (255), -1)
         return valid
 
     @property
     def width(self):
+        """ Getter for image width."""
         return self._img_size[1]
 
     @property
     def height(self):
+        """ Getter for image height."""
         return self._img_size[0]
 
     def __repr__(self):
@@ -162,6 +201,8 @@ class OcamCamera:
         print_list.append(f"xc(col dir): {self._xc}, \tyc(row dir): {self._yc} in Ocam coord")
         print_list.append(f"affine: {self._affine}")
         print_list.append(f"img_size: {self._img_size}")
+        if self._fov < 360:
+            print_list.append(f"fov: {self._fov}")
         return "\n".join(print_list)
 
     def __hash__(self):
@@ -172,6 +213,10 @@ class OcamCamera:
 
 
 if __name__ == '__main__':
+    import doctest
+    doctest.testmod(verbose=0)
+
+    # check reprojection error
     ocam_file = './calib_results_0.txt'
     ocam = OcamCamera(ocam_file)
     error = []
