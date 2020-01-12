@@ -1,5 +1,5 @@
-import numpy as np
 import cv2  # only for valid_area
+import numpy as np
 
 
 class OcamCamera:
@@ -194,6 +194,16 @@ class OcamCamera:
         """ Getter for image height."""
         return self._img_size[0]
 
+    @property
+    def cx(self):
+        """ Getter for image center cx (OpenCV format)."""
+        return self._yc
+
+    @property
+    def cy(self):
+        """ Getter for image center cy (OpenCV format)."""
+        return self._xc
+
     def __repr__(self):
         print_list = []
         print_list.append(f"pol: {self._pol}")
@@ -213,15 +223,17 @@ class OcamCamera:
 
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod(verbose=0)
+    from ocamcamera import OcamCamera
+
+    # import doctest
+    # doctest.testmod(verbose=1)
 
     # check reprojection error
     ocam_file = './calib_results_0.txt'
     ocam = OcamCamera(ocam_file)
     error = []
     for _ in range(100):
-        point2D = np.random.rand(2) * ocam._xc
+        point2D = np.random.rand(2) * ocam.cx
         point3D = ocam.cam2world(point2D)
         reproj = ocam.world2cam(point3D)
         error.append(np.linalg.norm(point2D - reproj.flatten()))
