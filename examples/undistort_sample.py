@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -5,8 +6,10 @@ from ocamcamera import OcamCamera
 
 
 def main():
-    ocam_file = '../ocamcamera/calib_results_0.txt'
-    img = cv2.imread('../ocamcamera/img0.jpg')
+    current_folder = os.path.dirname(os.path.realpath(__file__))
+    img_file = os.path.join(current_folder, '../ocamcamera/img0.jpg')
+    ocam_file = os.path.join(current_folder, '../ocamcamera/calib_results_0.txt')
+    img = cv2.imread(img_file)
     ocam = OcamCamera(ocam_file, fov=185)
     print(ocam)
 
