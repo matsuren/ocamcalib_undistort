@@ -91,7 +91,16 @@ class OcamCamera:
         # distance [pixels] of  the point from the image center
         r = np.sqrt(xp * xp + yp * yp)
         # be careful about z axis direction
-        zp = -np.array([elment * r ** i for (i, elment) in enumerate(self._pol)]).sum(axis=0)
+        # zp = -np.array([element * r ** i for (i, element) in enumerate(self._pol)]).sum(axis=0) is slow
+        for (i, element) in enumerate(self._pol):
+            if i == 0:
+                zp = np.full_like(r, element)
+                tmp_r = r.copy()
+            else:
+                zp += element * tmp_r
+                tmp_r *= r
+        zp *= -1
+
         # normalize to unit norm
         point3D = np.stack([yp, xp, zp])
         point3D /= np.linalg.norm(point3D, axis=0)
@@ -150,7 +159,15 @@ class OcamCamera:
         # else
         theta = -np.arctan(point3D[2][valid_flag] / norm[valid_flag])
         invnorm = 1 / norm[valid_flag]
-        rho = np.array([elment * theta ** i for (i, elment) in enumerate(self._invpol)]).sum(axis=0)
+        #     rho = np.array([element * theta ** i for (i, element) in enumerate(self._invpol)]).sum(axis=0) is slow
+        for (i, element) in enumerate(self._invpol):
+            if i == 0:
+                rho = np.full_like(theta, element)
+                tmp_theta = theta.copy()
+            else:
+                rho += element * tmp_theta
+                tmp_theta *= theta
+
         u = point3D[0][valid_flag] * invnorm * rho
         v = point3D[1][valid_flag] * invnorm * rho
         point2D_valid_0 = v * self._affine[2] + u + self._yc
@@ -180,7 +197,7 @@ class OcamCamera:
 
         valid = np.zeros(self._img_size, dtype=np.uint8)
         theta = np.deg2rad(self._fov / 2) - np.pi / 2
-        rho = sum([elment * theta ** i for (i, elment) in enumerate(self._invpol)])
+        rho = sum([element * theta ** i for (i, element) in enumerate(self._invpol)])
         cv2.ellipse(valid, ((self._yc, self._xc), (2 * rho, 2 * rho * self._affine[0]), 0), (255), -1)
         return valid
 
